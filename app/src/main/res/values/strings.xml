@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Aashvik AI</string>
+    <string name="tagline">Friendly Mind, Helpful Heart!</string>
+    <string name="welcome_message">Hello! 👋 Welcome to Aashvik AI. I\'m your friendly AI assistant, ready to help you learn, create, explore, and solve problems. What would you like to do today?</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="sign_out">Sign out</string>
+    <string name="new_chat">New chat</string>
+    <string name="chat_history">Chat history</string>
+    <string name="clear_conversation">Clear conversation</string>
+    <string name="clear_all_chats">Clear all chats</string>
+    <string name="copy_response">Copy response</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="type_message_hint">Ask Aashvik anything…</string>
+    <string name="send_message">Send message</string>
+    <string name="stop_generating">Stop generating</string>
+    <string name="voice_input">Voice input</string>
+    <string name="listening_now">Listening… speak now</string>
+    <string name="attach_file">Attach image or data file</string>
+    <string name="attach_image">Photo or chart (Image)</string>
+    <string name="attach_data">Data file (CSV, JSON, TXT)</string>
+    <string name="sync_active">Cloud sync active</string>
+    <string name="aashvik_thinking">Aashvik is thinking</string>
+</resources>

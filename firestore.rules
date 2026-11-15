@@ -1,0 +1,302 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+             request.auth.token.email == 'aroraashu81@gmail.com' &&
+             request.auth.token.email_verified == true;
+    }
+
+    function isNotBanned(userId) {
+      return !exists(/databases/$(database)/documents/users/$(userId)) ||
+             get(/databases/$(database)/documents/users/$(userId)).data.moderationStatus != 'banned';
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 200)) &&
+             data.themeMode in ['system', 'light', 'dark'] &&
+             data.preferredModel in ['gemini-3.8-flash', 'gemini-3.5-flash-lite'] &&
+             data.ttsEnabled is bool &&
+             data.termsAccepted is bool &&
+             data.termsAcceptedVersion is string && data.termsAcceptedVersion.size() <= 32 &&
+             data.moderationStatus in ['active', 'warned', 'suspended', 'banned'] &&
+             (!('banReason' in data) || data.banReason == null || (data.banReason is string && data.banReason.size() <= 300)) &&
+             data.warningCount is int && data.warningCount >= 0 && data.warningCount <= 100 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidConversation(data, userId) {
+      return data.userId is string && data.userId == userId && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.lastMessagePreview is string && data.lastMessagePreview.size() <= 240 &&
+             data.messageCount is int && data.messageCount >= 0 && data.messageCount <= 100000 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data, userId, conversationId) {
+      return data.userId is string && data.userId == userId && data.userId == request.auth.uid &&
+             data.conversationId is string && data.conversationId == conversationId &&
+             data.role in ['user', 'model'] &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 60000 &&
+             (!('attachmentName' in data) || data.attachmentName == null || (data.attachmentName is string && data.attachmentName.size() >= 1 && data.attachmentName.size() <= 200)) &&
+             (!('attachmentType' in data) || data.attachmentType == null || (data.attachmentType in ['image', 'data'])) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSafetyPolicy(data) {
+      return data.strictModeEnabled is bool &&
+             data.autoFlagViolations is bool &&
+             data.blockedKeywords is list && data.blockedKeywords.size() <= 50 &&
+             data.customSafetyDirectives is string && data.customSafetyDirectives.size() <= 2000 &&
+             data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 200 &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidSafetyViolation(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userDisplayName is string && data.userDisplayName.size() >= 1 && data.userDisplayName.size() <= 100 &&
+             (!('userEmail' in data) || data.userEmail == null || (data.userEmail is string && data.userEmail.size() <= 200)) &&
+             data.category in ['harmful_content', 'jailbreak', 'blocked_keyword', 'model_safety_filter', 'other'] &&
+             data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 500 &&
+             data.promptSnippet is string && data.promptSnippet.size() <= 300 &&
+             data.severity in ['low', 'medium', 'high'] &&
+             data.status in ['open', 'reviewed', 'dismissed'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidViolationReport(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.reporterName is string && data.reporterName.size() >= 1 && data.reporterName.size() <= 100 &&
+             (!('reporterEmail' in data) || data.reporterEmail == null || (data.reporterEmail is string && data.reporterEmail.size() <= 200)) &&
+             data.category in ['harmful_output', 'harassment_abuse', 'privacy_security', 'misinformation', 'policy_bug', 'other'] &&
+             data.description is string && data.description.size() >= 10 && data.description.size() <= 2000 &&
+             data.status in ['open', 'resolved', 'dismissed'] &&
+             (!('adminNotes' in data) || data.adminNotes == null || (data.adminNotes is string && data.adminNotes.size() <= 1000)) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'themeMode', 'preferredModel',
+                         'ttsEnabled', 'termsAccepted', 'termsAcceptedVersion',
+                         'moderationStatus', 'warningCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'email', 'themeMode', 'preferredModel',
+                         'ttsEnabled', 'termsAccepted', 'termsAcceptedVersion',
+                         'moderationStatus', 'banReason', 'warningCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().moderationStatus == 'active' &&
+                       (!('banReason' in incoming()) || incoming().banReason == null) &&
+                       incoming().warningCount == 0 &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow update: if isSignedIn() &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       (
+                         (
+                           request.auth.uid == userId &&
+                           existing().moderationStatus != 'banned' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'displayName', 'email', 'themeMode', 'preferredModel',
+                             'ttsEnabled', 'termsAccepted', 'termsAcceptedVersion', 'updatedAt'
+                           ])
+                         ) ||
+                         (
+                           request.auth.uid == userId &&
+                           existing().moderationStatus != 'banned' &&
+                           incoming().moderationStatus == 'banned' &&
+                           incoming().warningCount >= existing().warningCount &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'moderationStatus', 'banReason', 'warningCount', 'updatedAt'
+                           ])
+                         ) ||
+                         (
+                           isAdmin() &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'moderationStatus', 'banReason', 'warningCount', 'updatedAt'
+                           ])
+                         )
+                       );
+
+      allow delete: if (isSignedIn() && request.auth.uid == userId && existing().moderationStatus != 'banned') || isAdmin();
+
+      match /conversations/{conversationId} {
+        allow get: if isSignedIn() && request.auth.uid == userId && isValidId(conversationId);
+        allow list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         isNotBanned(userId) &&
+                         isValidId(conversationId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'lastMessagePreview', 'messageCount', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'lastMessagePreview', 'messageCount', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidConversation(incoming(), userId);
+
+        allow update: if isSignedIn() &&
+                         isNotBanned(userId) &&
+                         isValidId(conversationId) &&
+                         isValidConversation(incoming(), userId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'lastMessagePreview', 'messageCount', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId && isNotBanned(userId) && isValidId(conversationId);
+
+        match /messages/{messageId} {
+          allow get: if isSignedIn() && request.auth.uid == userId && isValidId(conversationId) && isValidId(messageId);
+          allow list: if isSignedIn() && request.auth.uid == userId && isValidId(conversationId);
+
+          allow create: if isSignedIn() &&
+                           request.auth.uid == userId &&
+                           isNotBanned(userId) &&
+                           isValidId(conversationId) &&
+                           isValidId(messageId) &&
+                           incoming().keys().hasAll(['userId', 'conversationId', 'role', 'text', 'createdAt']) &&
+                           incoming().keys().hasOnly(['userId', 'conversationId', 'role', 'text', 'attachmentName', 'attachmentType', 'createdAt']) &&
+                           incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                           isValidChatMessage(incoming(), userId, conversationId) &&
+                           existsAfter(/databases/$(database)/documents/users/$(userId)/conversations/$(conversationId));
+
+          allow update: if false;
+
+          allow delete: if isSignedIn() && request.auth.uid == userId && isNotBanned(userId) && isValidId(conversationId) && isValidId(messageId);
+        }
+      }
+    }
+
+    match /safety_policies/{policyId} {
+      allow get: if isSignedIn() && isValidId(policyId);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() &&
+                       isValidId(policyId) &&
+                       incoming().keys().hasAll([
+                         'strictModeEnabled', 'autoFlagViolations', 'blockedKeywords',
+                         'customSafetyDirectives', 'updatedBy', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'strictModeEnabled', 'autoFlagViolations', 'blockedKeywords',
+                         'customSafetyDirectives', 'updatedBy', 'updatedAt'
+                       ]) &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidSafetyPolicy(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(policyId) &&
+                       isValidSafetyPolicy(incoming()) &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'strictModeEnabled', 'autoFlagViolations', 'blockedKeywords',
+                         'customSafetyDirectives', 'updatedBy', 'updatedAt'
+                       ]);
+
+      allow delete: if isAdmin() && isValidId(policyId);
+    }
+
+    match /safety_violations/{violationId} {
+      allow get: if isAdmin() || (isSignedIn() && isValidId(violationId) && existing().userId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(violationId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'open' &&
+                       incoming().keys().hasAll([
+                         'userId', 'userDisplayName', 'category', 'reason',
+                         'promptSnippet', 'severity', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'userDisplayName', 'userEmail', 'category', 'reason',
+                         'promptSnippet', 'severity', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidSafetyViolation(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(violationId) &&
+                       isValidSafetyViolation(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(violationId);
+    }
+
+    match /violation_reports/{reportId} {
+      allow get: if isAdmin() || (isSignedIn() && isValidId(reportId) && existing().userId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(reportId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'open' &&
+                       (!('adminNotes' in incoming()) || incoming().adminNotes == null) &&
+                       incoming().keys().hasAll([
+                         'userId', 'reporterName', 'category', 'description',
+                         'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'reporterName', 'reporterEmail', 'category', 'description',
+                         'status', 'adminNotes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidViolationReport(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(reportId) &&
+                       isValidViolationReport(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminNotes', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(reportId);
+    }
+  }
+}

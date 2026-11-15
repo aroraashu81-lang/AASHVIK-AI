@@ -1,0 +1,340 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Stores Aashvik AI user preferences, terms acceptance, and moderation/ban standing.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this profile."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name shown in the greeting and drawer."
+        },
+        "email": {
+          "type": "string",
+          "description": "User Google email address (readable only by owner and verified admin)."
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["system", "light", "dark"],
+          "description": "Synced appearance mode preference."
+        },
+        "preferredModel": {
+          "type": "string",
+          "enum": ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+          "description": "Synced default Gemini model tier."
+        },
+        "ttsEnabled": {
+          "type": "boolean",
+          "description": "Whether spoken responses are enabled."
+        },
+        "termsAccepted": {
+          "type": "boolean",
+          "description": "Whether the user has accepted the Terms of Service and Violation Policy."
+        },
+        "termsAcceptedVersion": {
+          "type": "string",
+          "description": "Accepted Terms & Violation Policy version string."
+        },
+        "moderationStatus": {
+          "type": "string",
+          "enum": ["active", "warned", "suspended", "banned"],
+          "description": "Account standing. Automatically transitions to 'banned' on policy violations; only verified admin can restore."
+        },
+        "banReason": {
+          "type": "string",
+          "description": "Optional reason recorded when an account is permanently banned."
+        },
+        "warningCount": {
+          "type": "integer",
+          "description": "Number of policy violations/warnings recorded on the account."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "themeMode",
+        "preferredModel",
+        "ttsEnabled",
+        "termsAccepted",
+        "termsAcceptedVersion",
+        "moderationStatus",
+        "warningCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A synced Aashvik AI conversation thread belonging to a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this conversation."
+        },
+        "title": {
+          "type": "string",
+          "description": "Conversation title derived from first prompt or user rename."
+        },
+        "lastMessagePreview": {
+          "type": "string",
+          "description": "Short preview of the latest message in the thread."
+        },
+        "messageCount": {
+          "type": "integer",
+          "description": "Total number of messages in this conversation."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when conversation was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when conversation was last active (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["userId", "title", "lastMessagePreview", "messageCount", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "An individual user or Aashvik AI message within a conversation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this message."
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Parent conversation document ID."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "model"],
+          "description": "Sender role: user or model."
+        },
+        "text": {
+          "type": "string",
+          "description": "Message text content."
+        },
+        "attachmentName": {
+          "type": "string",
+          "description": "Optional attached file or image name."
+        },
+        "attachmentType": {
+          "type": "string",
+          "enum": ["image", "data"],
+          "description": "Optional attachment category."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when message was sent (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["userId", "conversationId", "role", "text", "createdAt"]
+    },
+    "SafetyPolicy": {
+      "title": "SafetyPolicy",
+      "description": "Admin-managed global AI safety training directives and content filtering rules.",
+      "type": "object",
+      "properties": {
+        "strictModeEnabled": {
+          "type": "boolean",
+          "description": "Whether strictest model safety thresholds (LOW_AND_ABOVE) and prompt guardrails are enforced."
+        },
+        "autoFlagViolations": {
+          "type": "boolean",
+          "description": "Whether blocked prompts/responses are automatically logged for admin review."
+        },
+        "blockedKeywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Admin-defined list of custom blocked keywords or phrases."
+        },
+        "customSafetyDirectives": {
+          "type": "string",
+          "description": "Additional safety instructions injected into the Aashvik AI system prompt."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Email of the verified admin who updated the safety policy."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when safety policy was last updated."
+        }
+      },
+      "required": [
+        "strictModeEnabled",
+        "autoFlagViolations",
+        "blockedKeywords",
+        "customSafetyDirectives",
+        "updatedBy",
+        "updatedAt"
+      ]
+    },
+    "SafetyViolation": {
+      "title": "SafetyViolation",
+      "description": "Automatically logged AI safety policy violation event for admin moderation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID that triggered the guardrail or safety block."
+        },
+        "userDisplayName": {
+          "type": "string",
+          "description": "Display name of the user."
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "Optional email of the user."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["harmful_content", "jailbreak", "blocked_keyword", "model_safety_filter", "other"],
+          "description": "Safety rule category triggered."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable explanation of the safety trigger."
+        },
+        "promptSnippet": {
+          "type": "string",
+          "description": "Truncated snippet of the offending prompt for review."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Estimated severity of the violation."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "reviewed", "dismissed"],
+          "description": "Admin review status."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when violation was logged."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when violation was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "userDisplayName",
+        "category",
+        "reason",
+        "promptSnippet",
+        "severity",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ViolationReport": {
+      "title": "ViolationReport",
+      "description": "User-submitted report of a policy violation, unsafe response, or abuse.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID submitting the report."
+        },
+        "reporterName": {
+          "type": "string",
+          "description": "Display name of the reporter."
+        },
+        "reporterEmail": {
+          "type": "string",
+          "description": "Optional email of the reporter."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["harmful_output", "harassment_abuse", "privacy_security", "misinformation", "policy_bug", "other"],
+          "description": "Violation report category."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed report description provided by the user."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved", "dismissed"],
+          "description": "Admin moderation status."
+        },
+        "adminNotes": {
+          "type": "string",
+          "description": "Optional resolution notes added by the admin."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when report was submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when report was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "reporterName",
+        "category",
+        "description",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user synced settings, terms acceptance, and moderation/ban standing."
+    },
+    "/users/{userId}/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "User's synced AI chat conversations."
+    },
+    "/users/{userId}/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Ordered messages inside a synced conversation."
+    },
+    "/safety_policies/{policyId}": {
+      "schema": { "$ref": "#/entities/SafetyPolicy" },
+      "description": "Global AI safety training configuration managed by verified admin."
+    },
+    "/safety_violations/{violationId}": {
+      "schema": { "$ref": "#/entities/SafetyViolation" },
+      "description": "Auto-flagged AI safety violation log entries for admin moderation."
+    },
+    "/violation_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/ViolationReport" },
+      "description": "User-submitted policy and safety violation reports."
+    }
+  }
+}

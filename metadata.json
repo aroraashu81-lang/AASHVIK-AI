@@ -1,0 +1,6 @@
+{
+  "name": "Aashvik AI",
+  "description": "Friendly Mind, Helpful Heart! Aashvik AI is a friendly, intelligent AI assistant with voice input, multimodal data analysis, and cloud-synced conversation history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
